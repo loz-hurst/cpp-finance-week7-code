@@ -93,7 +93,50 @@ namespace MonteCarlo {
          *        accumulator_values = sum(max(S_t - X), 0)
          */
         result->value = discount*accumulator_values/data.paths;
-        result->error = std::sqrt(accumulator_squares/data.paths - result->value*result->value);
+        result->error = discount*std::sqrt(accumulator_squares/data.paths - result->value*result->value)/data.paths;
+
+        return result;
+
+    }
+
+    std::unique_ptr<Result> Ln_S(const Data& data) {
+        // This follows the same process as Plain - so see the comments in there for the most part
+        std::unique_ptr<Result> result {std::make_unique<Result>(Result{0, 0})};
+
+        const double delta_t {data.maturity/data.steps};
+        const double drift {(data.rate-0.5*data.sigma*data.sigma)*delta_t};
+        const double sigma_sqrt_delta_t {data.sigma*std::sqrt(delta_t)};
+        const double discount {std::exp(-data.rate * data.maturity)};
+
+        // Find log of S_0 - we will need that for each path
+        const double ln_S_0 {std::log(data.S_0)};
+
+        double accumulator_values {0};
+        double accumulator_squares {0};
+
+        for(long i {0}; data.paths > i; ++i){
+            Utility::print_progress(i+1, 50000);
+
+            // Starting from ln(S_0) instead of S_0
+            double ln_S {ln_S_0};
+
+            for(long j {0}; data.steps > j; ++j) {
+                double w {Random::GetNormalValue()};
+                // Calculating ln_S now, so addition instead of product and no exp to find
+                ln_S += drift + sigma_sqrt_delta_t*w;
+            }
+
+            const double S {std::exp(ln_S)}; // This is the only call to exp for each path
+
+            const double payoff {std::max(S-data.strike, 0.0)};
+
+            accumulator_values += payoff;
+            accumulator_squares += payoff*payoff;
+        }
+        Utility::print_clear();
+
+        result->value = discount*accumulator_values/data.paths;
+        result->error = discount*std::sqrt(accumulator_squares/data.paths - result->value*result->value)/data.paths;
 
         return result;
 

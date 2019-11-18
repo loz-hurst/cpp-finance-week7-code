@@ -38,13 +38,19 @@ void print_result(const double value, const double error, const time_t start, co
 
 int main() {
     // S_0, rate, sigma, maturity, strike, paths, steps
-    MC::Data option {100, 0.05, 0.20, 1, 100, 1000000, 100};
+    MC::Data option {100, 0.05, 0.20, 1, 100, 1000000, 200};
 
     std::cout << "Begin plain Monte Carlo:" << std::endl;
     time_t plain_mc_start {std::clock()};
     const std::unique_ptr<MC::Result> plain_result {MC::Plain(option)};
     time_t plain_mc_end {std::clock()};
     print_result(plain_result->value, plain_result->error, plain_mc_start, plain_mc_end);
+
+    std::cout << "Begin ln_S Monte Carlo:" << std::endl;
+    time_t ln_S_mc_start {std::clock()};
+    const std::unique_ptr<MC::Result> ln_S_result {MC::Plain(option)};
+    time_t ln_S_mc_end {std::clock()};
+    print_result(ln_S_result->value, ln_S_result->error, ln_S_mc_start, ln_S_mc_end);
 
     return 0;
 }

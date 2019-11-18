@@ -54,6 +54,9 @@ namespace MonteCarlo {
      *   Result contain the estimate and a measure of its error
      */
     std::unique_ptr<Result> Plain(const Data &);
+
+    // Exactly the same as Plain but finds R_t=ln(S_t) internally before recovering S_t with a single exponent call.
+    std::unique_ptr<Result> Ln_S(const Data &);
 }
 
 #endif //CPP_FINANCE_WEEK7_CODE_MONTECARLO_HPP
