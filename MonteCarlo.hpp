@@ -28,6 +28,7 @@
 #include <memory>
 
 namespace MonteCarlo {
+    // Familiar B-S Option data with extra slots for Monte-Carlo settings
     struct Data {
         double S_0;
         double rate;
@@ -38,6 +39,22 @@ namespace MonteCarlo {
         long paths;
         long steps;
     };
+
+    // We need some additional data for OTM simulations - lower and upper bounds on payout
+    struct OtmData {
+        double S_0;
+        double rate;
+        double sigma;
+        double maturity;
+        double strike;
+
+        long paths;
+        long steps;
+
+        double lower;
+        double upper;
+    };
+
 
     struct Result {
         double value;
@@ -68,6 +85,16 @@ namespace MonteCarlo {
 
     // Importance Sampling benchmark using Importance Sampling
     std::unique_ptr<Result> Is_Benchmark_Is(const Data &);
+
+    // Importance Sampling OTM European Binary option explicit solution (no MC)
+    std::unique_ptr<Result> Is_Otm_Explicit(const OtmData &);
+
+    // Importance Sampling OTM European Binary option using plain Monte Carlo
+    std::unique_ptr<Result> Is_Otm_Plain(const OtmData &);
+
+    // Importance Sampling OTM European Binary option using Importance Sampling
+    std::unique_ptr<Result> Is_Otm_Is(const OtmData &);
+
 }
 
 #endif //CPP_FINANCE_WEEK7_CODE_MONTECARLO_HPP

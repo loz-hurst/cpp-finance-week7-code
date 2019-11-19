@@ -104,6 +104,19 @@ int main() {
         print_result(trail_100k_result->value, trail_100k_result->error, trial_100k_start, trial_100k_end);
     }
 
+    std::cout << "Begin IS OTM European Binary:" << std::endl;
+    // S_0, rate, sigma, maturity, strike, paths, steps, lower, upper
+    const MC::OtmData otm_data {100, 0.05, 0.2, 1, 0, 1000000, 100, 150, 160};
+    const std::unique_ptr<MC::Result> otm_explicit_result {MC::Is_Otm_Explicit(otm_data)};
+    std::cout << "Explicit solution: " << otm_explicit_result->value << std::endl;
+    const time_t otm_plain_start {std::clock()};
+    const std::unique_ptr<MC::Result> otm_plain_result {MC::Is_Otm_Plain(otm_data)};
+    const time_t otm_plain_end {std::clock()};
+    std::cout << "Plain MC: "; print_result(otm_plain_result->value, otm_plain_result->error, otm_plain_start, otm_plain_end);
+    const time_t otm_is_start {std::clock()};
+    const std::unique_ptr<MC::Result> otm_is_result {MC::Is_Otm_Is(otm_data)};
+    const time_t otm_is_end {std::clock()};
+    std::cout << "   IS MC: "; print_result(otm_is_result->value, otm_is_result->error, otm_is_start, otm_is_end);
 
 
     return 0;

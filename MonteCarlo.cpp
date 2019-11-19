@@ -28,6 +28,7 @@
 #include <utility>
 #include <vector>
 #include "MonteCarlo.hpp"
+#include "MathUtil.hpp"
 #include "Random.hpp"
 #include "Utility.hpp"
 
@@ -296,6 +297,147 @@ namespace MonteCarlo {
 
         return result;
 
+    }
+
+    std::unique_ptr<Result> Is_Otm_Explicit(const OtmData & data) {
+        // The error will be 0 as this is an explicit solution but use Result to be consistent
+        std::unique_ptr<Result> result {std::make_unique<Result>(Result{0, 0})};
+
+        // e^(-rT)
+        const double discount {std::exp(-data.rate*data.maturity)};
+
+        // mu_t = ln(S_t) + (r - 0.5*sigma^2)(T-t)
+        const double mu_0 = std::log(data.S_0) + (data.rate - 0.5*data.sigma*data.sigma)*data.maturity;
+        // sigma_t^2 = sigma^2*(T-t)
+        const double sigma_0 = data.sigma*std::sqrt(data.maturity);
+
+        // F(S) = N((ln(S) - mu_t)/sigma_t)
+        const double F_L {MathUtil::NormalCdf((std::log(data.lower)-mu_0)/sigma_0)};
+        const double F_U {MathUtil::NormalCdf((std::log(data.upper)-mu_0)/sigma_0)};
+
+        result->value = discount*(F_U-F_L);
+
+        return result;
+    }
+
+    std::unique_ptr<Result> Is_Otm_Plain(const OtmData & data) {
+        std::unique_ptr<Result> result {std::make_unique<Result>(Result{0, 0})};
+
+        // See Is_Otm_Explicit for comments on these
+        const double discount {std::exp(-data.rate*data.maturity)};
+        const double mu_0 = std::log(data.S_0) + (data.rate - 0.5*data.sigma*data.sigma)*data.maturity;
+        const double sigma_0 = data.sigma*std::sqrt(data.maturity);
+
+        const double explicit_c {Is_Otm_Explicit(data)->value}; // So we can find the error
+
+        double accumulator_acc_square {0};
+        // Store the values so we can return an average
+        double accumulator_value {0};
+
+        // As for IS_Benchmark - will do "steps" repeats of "paths" samples
+        for (long i {0}; data.steps > i; ++i) {
+            double accumulator_p {0};
+            double accumulator_p_squared {0};
+
+            for (long j {0}; data.paths > j; ++j) {
+                const double s_t {std::exp(mu_0 + sigma_0 * Random::GetNormalValue())};
+                const double p {(data.lower <= s_t && data.upper >= s_t) ? 1.0 : 0.0};
+
+                accumulator_p += p;
+                accumulator_p_squared += p*p;
+            }
+
+            const double value {discount*accumulator_p/data.paths};
+            accumulator_value += value;
+            accumulator_acc_square += (value-explicit_c)*(value-explicit_c);
+
+        }
+
+        result->value = accumulator_value/data.steps;
+        result->error = std::sqrt(accumulator_acc_square)/data.steps;
+
+        return result;
+    }
+
+    // Importance Sampling OTM European Binary option using Importance Sampling
+    std::unique_ptr<Result> Is_Otm_Is(const OtmData & data) {
+        std::unique_ptr<Result> result {std::make_unique<Result>(Result{0, 0})};
+
+        // See Is_Otm_Explicit for comments on these
+        const double discount {std::exp(-data.rate*data.maturity)};
+        const double mu_0 = std::log(data.S_0) + (data.rate - 0.5*data.sigma*data.sigma)*data.maturity;
+        const double sigma_0 = data.sigma*std::sqrt(data.maturity);
+
+        /* We need to be able to compute f(S) quite a few times, using const values we have already specified and
+         * only need to do so in this function - perfect use-case for a lambda function!
+         */
+        auto f_S = [mu_0, sigma_0] (const double S) -> double {
+            const double n_s {(std::log(S) - mu_0)/sigma_0};
+            const double denom {S*sigma_0*std::sqrt(2*MathUtil::PI)};
+
+            return std::exp(n_s*n_s/-2)/denom;
+        };
+
+        // Pre-calculate f(S) at L and U
+        const double f_L {f_S(data.lower)};
+        const double f_U {f_S(data.upper)};
+
+        const double explicit_c {Is_Otm_Explicit(data)->value}; // So we can find the error
+
+        double accumulator_acc_square {0};
+        // Store the values so we can return an average
+        double accumulator_value {0};
+
+        // We will also want to get random values uniformly between an arbitrary range:
+        auto uniform_rand = [data] () -> double {
+            return data.lower + (data.upper - data.lower)*Random::GetRandom();
+        };
+
+        // As for IS_Benchmark - will do "steps" repeats of "paths" samples
+        for (long i {0}; data.steps > i; ++i) {
+            double accumulator_p {0};
+            double accumulator_p_squared {0};
+
+            for (long j {0}; data.paths > j; ++j) {
+                // Compute our g(S)
+                // Work out r according to which way round our triangle is
+                const double r {(f_L > f_U) ? (f_L - f_U)/2*f_U : (f_U-f_L)/2*f_L};
+                const double prob_b {1.0/(1+r)}; // Probability of area 'B' (uniform variable)
+
+                // Get a single random variable in the interval 0,1
+                const double rand {Random::GetRandom()};
+
+                double g_s {0};
+                const double w_1 {uniform_rand()}, w_2 {uniform_rand()};
+                if ( rand <= prob_b ) {
+                    // Return a uniform variable
+                    g_s = w_1;
+                } else {
+                    // Triangle variable, but which way round?
+                    if (f_L > f_U) {
+                        g_s = std::min(w_1, w_2);
+                    } else {
+                        g_s = std::max(w_1, w_2);
+                    }
+                }
+
+                // Got g(S), we need to set p to be the weighted value
+                const double p {f_S(g_s)/((f_L+(g_s-data.lower)*(f_U-f_L)/(data.upper-data.lower))/((f_L+f_U)*(data.upper-data.lower)/2))};
+
+                accumulator_p += p;
+                accumulator_p_squared += p*p;
+            }
+
+            const double value {discount*accumulator_p/data.paths};
+            accumulator_value += value;
+            accumulator_acc_square += (value-explicit_c)*(value-explicit_c);
+
+        }
+
+        result->value = accumulator_value/data.steps;
+        result->error = std::sqrt(accumulator_acc_square)/data.steps;
+
+        return result;
     }
 
 }

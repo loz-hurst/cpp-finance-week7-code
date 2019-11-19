@@ -21,15 +21,11 @@
  * See the file LICENCE in the original source code repository for the
  * full licence.
  */
+#include <cmath>
+#include "MathUtil.hpp"
 
-#ifndef CPP_FINANCE_WEEK7_CODE_RANDOM_HPP
-#define CPP_FINANCE_WEEK7_CODE_RANDOM_HPP
-
-namespace Random {
-    // Returns a random value uniformly distributed in the interval [0, 1)
-    double GetRandom();
-    // Returns a random value drawn from the standard normal distribution.
-    double GetNormalValue();
+namespace MathUtil {
+    double NormalCdf(const double x) {
+        return std::erfc(-x/std::sqrt(2))/2;
+    }
 }
-
-#endif //CPP_FINANCE_WEEK7_CODE_RANDOM_HPP

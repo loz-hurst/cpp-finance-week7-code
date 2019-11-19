@@ -32,9 +32,14 @@ namespace {
     std::mt19937 engine ((unsigned int)std::chrono::system_clock::now().time_since_epoch().count());
     //std::default_random_engine engine;
     std::normal_distribution<double> standard_normal_distribution(0, 1);
+    std::uniform_real_distribution<double> uniform_0_1(0, 1);
 }
 
 namespace Random {
+    double GetRandom() {
+        return ::uniform_0_1(::engine);
+    }
+
     double GetNormalValue() {
         return ::standard_normal_distribution(::engine);
     }

@@ -22,14 +22,14 @@
  * full licence.
  */
 
-#ifndef CPP_FINANCE_WEEK7_CODE_RANDOM_HPP
-#define CPP_FINANCE_WEEK7_CODE_RANDOM_HPP
+#ifndef CPP_FINANCE_WEEK7_CODE_MATHUTIL_HPP
+#define CPP_FINANCE_WEEK7_CODE_MATHUTIL_HPP
 
-namespace Random {
-    // Returns a random value uniformly distributed in the interval [0, 1)
-    double GetRandom();
-    // Returns a random value drawn from the standard normal distribution.
-    double GetNormalValue();
+namespace MathUtil {
+    const double PI {3.141592653589793};
+
+    // Returns N(x)
+    double NormalCdf (double x);
 }
 
-#endif //CPP_FINANCE_WEEK7_CODE_RANDOM_HPP
+#endif //CPP_FINANCE_WEEK7_CODE_MATHUTIL_HPP
