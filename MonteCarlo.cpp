@@ -220,4 +220,82 @@ namespace MonteCarlo {
 
     }
 
+    std::unique_ptr<Result> Is_Benchmark_Plain(const Data& data) {
+        std::unique_ptr<Result> result {std::make_unique<Result>(Result{0, 0})};
+
+        const double quartile {0.99}; // Nintey-ninth quartile
+        // Ideally would calculate from quartile but non-trival and easily looked up.
+        const double inv_quartile {2.3263};
+
+        const double quartile_over {1-quartile}; // proportion over the quartile
+
+        // Store the square of the "accuracy" (the difference^2 of samples were over the quartile vs proportion expected)
+        double accumulator_acc_square {0};
+        // Store the values so we can return an average
+        double accumulator_value {0};
+
+        // Slightly fudging what we use steps and paths for - will do "steps" repeats of "paths" samples
+        for (int i {0}; data.steps > i; ++i) {
+            double accumulator_p {0};
+
+            for (int j {0}; data.paths > j; ++j) {
+                const double x {Random::GetNormalValue()};
+                double p {(x >= inv_quartile) ? 1.0 : 0.0};
+
+                accumulator_p += p;
+            }
+
+            double value {accumulator_p/data.paths}; // should be our proportion over the quartile
+            accumulator_acc_square += (value-quartile_over)*(value-quartile_over);
+            accumulator_value += value;
+        }
+
+
+        result->value = accumulator_value/data.steps;
+        result->error = std::sqrt(accumulator_acc_square)/data.steps;
+
+        return result;
+    }
+
+    std::unique_ptr<Result> Is_Benchmark_Is(const Data& data) {
+        // Mostly the same as Is_Benchmark_Plain so see those comments where required
+        std::unique_ptr<Result> result {std::make_unique<Result>(Result{0, 0})};
+
+        const double quartile {0.99};
+        const double inv_quartile {2.3263};
+
+        const double quartile_over {1-quartile};
+
+        double accumulator_acc_square {0};
+        double accumulator_value {0};
+
+        for (int i {0}; data.steps > i; ++i) {
+            double accumulator_p {0};
+
+            for (int j {0}; data.paths > j; ++j) {
+                // Random value from our non-standard normal distribution
+                const double x {data.sigma*Random::GetNormalValue()+data.rate};
+                double p {0};
+                if (x >= inv_quartile) {
+                    // This needs to be weighted to fit our new distribution back into the old one
+                    double x_minus_mu_div_sig {(x-data.rate)/data.sigma};
+                    p = data.sigma*std::exp(-0.5*(x*x - x_minus_mu_div_sig*x_minus_mu_div_sig));
+                }
+
+                accumulator_p += p;
+            }
+
+            double value {accumulator_p/data.paths};
+            accumulator_acc_square += (value-quartile_over)*(value-quartile_over);
+            accumulator_value += value;
+        }
+
+
+        result->value = accumulator_value/data.steps;
+        result->error = std::sqrt(accumulator_acc_square)/data.steps;
+
+        return result;
+
+    }
+
 }

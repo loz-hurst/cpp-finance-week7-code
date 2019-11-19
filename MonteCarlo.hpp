@@ -58,10 +58,16 @@ namespace MonteCarlo {
     // Exactly the same as Plain but finds R_t=ln(S_t) internally before recovering S_t with a single exponent call.
     std::unique_ptr<Result> Ln_S(const Data &);
 
-    /* Plain Monte Carol modified to use a control variate (CV) d = S_t - e^(-rT)*S_0
+    /* Plain Monte Carlo modified to use a control variate (CV) d = S_t - e^(-rT)*S_0
      * Puts the calculated correlation in the double passed by reference as the 2nd argument.
      */
     std::unique_ptr<Result> Cv(const Data &, double & correlation);
+
+    // Importance Sampling benchmark using plain Monte Carlo
+    std::unique_ptr<Result> Is_Benchmark_Plain(const Data &);
+
+    // Importance Sampling benchmark using Importance Sampling
+    std::unique_ptr<Result> Is_Benchmark_Is(const Data &);
 }
 
 #endif //CPP_FINANCE_WEEK7_CODE_MONTECARLO_HPP
