@@ -25,6 +25,8 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <utility>
+#include <vector>
 #include "MonteCarlo.hpp"
 #include "Random.hpp"
 #include "Utility.hpp"
@@ -141,4 +143,81 @@ namespace MonteCarlo {
         return result;
 
     }
+
+    std::unique_ptr<Result> Cv(const Data& data, double & correlation) {
+        // This follows the same process as Plain - so see the comments in there for the most part
+        std::unique_ptr<Result> result {std::make_unique<Result>(Result{0, 0})};
+
+        const double delta_t {data.maturity/data.steps};
+        const double drift {(data.rate-0.5*data.sigma*data.sigma)*delta_t};
+        const double sigma_sqrt_delta_t {data.sigma*std::sqrt(delta_t)};
+        const double discount {std::exp(-data.rate * data.maturity)};
+
+        // expected future stock price (e^(rT)S_0)
+        const double discount_S_0 {std::exp(data.rate*data.maturity) * data.S_0};
+
+        // This time we need to store each of the values as well as some accumulators
+
+        // Since we know the size (number of paths), using an array is going to be more memory efficient than a vector
+        std::vector<double> payoffs (data.paths); // Payoffs
+        std::vector<double> cvs (data.paths); // Control variants
+
+        // This time we will also need to know the sum of the control variants
+        double accumulator_cv_values {0};
+        // ...and the sum of the control variants squared
+        double accumulator_cv_squares {0};
+        // ...and the sum of the product of payoff and control variants
+        double accumulator_p_cv {0};
+        // ... as well as the sum of the payoffs and the payoffs squared (as before, but new variable names)
+        double accumulator_p_values {0};
+        double accumulator_p_squares {0};
+
+        for(long i {0}; data.paths > i; ++i) {
+            Utility::print_progress(i + 1, 50000);
+
+            double S{data.S_0};
+
+            for (long j{0}; data.steps > j; ++j) {
+                double w{Random::GetNormalValue()};
+                S = S * std::exp(drift + sigma_sqrt_delta_t * w);
+            }
+
+            // Store the payoff
+            payoffs[i] = std::max(S - data.strike, 0.0);
+            cvs[i] = S - discount_S_0;
+
+            accumulator_cv_values += cvs[i];
+            accumulator_cv_squares += cvs[i] * cvs[i];
+            accumulator_p_cv += payoffs[i] * cvs[i];
+            accumulator_p_values += payoffs[i];
+            accumulator_p_squares += payoffs[i]*payoffs[i];
+        }
+        Utility::print_clear();
+
+        // Crudely calculate beta = cov(c,d)/var(d)
+        const double beta {(accumulator_p_cv-accumulator_p_values*accumulator_cv_values/data.paths)/
+            (accumulator_cv_squares-accumulator_cv_values*accumulator_cv_values/data.paths)};
+
+        correlation = beta*std::sqrt(
+            (data.paths*accumulator_cv_squares - accumulator_cv_values*accumulator_cv_values)/
+            (data.paths*accumulator_p_squares - accumulator_p_values*accumulator_p_values)
+        );
+
+        // Now calculate the corrected payoff using cp = payoff_i - beta*cv_i
+        // We will need the accumulated sum and squares to calculate the final value and error, respectively
+        double accumulator_values {0};
+        double accumulator_squares {0};
+        for (int i {0}; data.paths > i; ++i) {
+            const double correct_p {payoffs[i] - beta*cvs[i]}; // corrected payoff
+            accumulator_values += correct_p;
+            accumulator_squares += correct_p*correct_p;
+        }
+
+        result->value = discount*accumulator_values/data.paths;
+        result->error = discount*std::sqrt(accumulator_squares/data.paths - result->value*result->value)/data.paths;
+
+        return result;
+
+    }
+
 }

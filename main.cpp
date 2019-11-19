@@ -38,7 +38,7 @@ void print_result(const double value, const double error, const time_t start, co
 
 int main() {
     // S_0, rate, sigma, maturity, strike, paths, steps
-    MC::Data option {100, 0.05, 0.20, 1, 100, 1000000, 200};
+    MC::Data option {100, 0.05, 0.20, 1, 100, 1000000, 100};
 
     std::cout << "Begin plain Monte Carlo:" << std::endl;
     time_t plain_mc_start {std::clock()};
@@ -48,9 +48,19 @@ int main() {
 
     std::cout << "Begin ln_S Monte Carlo:" << std::endl;
     time_t ln_S_mc_start {std::clock()};
-    const std::unique_ptr<MC::Result> ln_S_result {MC::Plain(option)};
+    const std::unique_ptr<MC::Result> ln_S_result {MC::Ln_S(option)};
     time_t ln_S_mc_end {std::clock()};
     print_result(ln_S_result->value, ln_S_result->error, ln_S_mc_start, ln_S_mc_end);
+
+    std::cout << "Begin CV Monte Carlo:" << std::endl;
+    time_t cv_mc_start {std::clock()};
+    double correlation;
+    const std::unique_ptr<MC::Result> cv_result {MC::Cv(option, correlation)};
+    time_t cv_mc_end {std::clock()};
+    print_result(cv_result->value, cv_result->error, cv_mc_start, cv_mc_end);
+    std::cout << "Correlation was: " << correlation << std::endl;
+
+
 
     return 0;
 }
